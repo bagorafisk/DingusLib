@@ -30,39 +30,20 @@ Renderer::Renderer(std::string title, int width, int height)
 
     glViewport(0, 0, WIDTH, HEIGHT);
 
-    glfwSetWindowUserPointer(window, this);
+    // Create and set up buffers
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
 
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-    glDisable(GL_DEPTH_TEST);
-
+    // Load shaders
     try {
-        defaultShader = Shader("default.vert", "default.frag");
+        defaultShader = Shader("Shaders/default.vert", "Shaders/default.frag");
     }
     catch (const std::exception& e) {
         std::cerr << "Shader initialization failed: " << e.what() << std::endl;
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
-
-    // Initialize buffers (only once)
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-    glGenVertexArrays(1, &VAO);
-
-    // Configure OpenGL buffers and attributes
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(0); // Unbind VAO for now
 }
 
 Renderer::~Renderer() {
@@ -71,42 +52,174 @@ Renderer::~Renderer() {
 }
 
 void Renderer::drawRectangle(float x, float y, float width, float height, Color color) {
-    // Set up rectangle vertices and indices
+    // Convert color to normalized float values (0.0 to 1.0)
+    float r = color.r / 255.0f;
+    float g = color.g / 255.0f;
+    float b = color.b / 255.0f;
+
+    // Vertices for a rectangle centered at origin
     float vertices[] = {
-        x, y, 1.0f, color.r / 255.0f, color.g / 255.0f, color.b / 255.0f,
-        x + width, y, 1.0f, color.r / 255.0f, color.g / 255.0f, color.b / 255.0f,
-        x + width, y + height, 1.0f, color.r / 255.0f, color.g / 255.0f, color.b / 255.0f,
-        x, y + height, 1.0f, color.r / 255.0f, color.g / 255.0f, color.b / 255.0f
+        // Positions        // Colors
+        -0.5f, -0.5f, 0.0f,   r, g, b,  // Bottom left
+         0.5f, -0.5f, 0.0f,   r, g, b,  // Bottom right
+         0.5f,  0.5f, 0.0f,   r, g, b,  // Top right
+        -0.5f,  0.5f, 0.0f,   r, g, b   // Top left
     };
 
-    unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
+    unsigned int indices[] = {
+        0, 1, 2,  // First triangle
+        2, 3, 0   // Second triangle
+    };
 
+    // Create transform for the rectangle
+    Transform transform;
+    transform.position = glm::vec2(x + width / 2, y + height / 2);
+    transform.scale = glm::vec2(width, height);
+
+    // Set shader uniforms including transform
+    Shader shader("Shaders/default.vert", "Shaders/default.frag");
+    shader.use();  // Make sure we're using the right shader
+    setShaderUniforms(transform);
+
+    // Update buffers
     glBindVertexArray(VAO);
-    // Update vertex buffer
+
+    // Buffer vertex data
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Update element buffer (indices)
+    // Buffer index data
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof(indices), indices);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     // Color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    //// Use shader and set projection matrix
-    defaultShader.use();
-    glm::mat4 projection = glm::ortho(0.0f, (float)WIDTH, 0.0f,(float)HEIGHT);
-    defaultShader.setMat4("projection", projection);
-
     // Draw the rectangle
-    glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);  // Unbind VAO
+
+    // Clean up
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
+
+void Renderer::drawCircle(const Transform& transform, float radius, const Color& color, int segments) {
+    segments = std::max(segments, 3);
+    std::vector<float> vertices;
+    std::vector<unsigned int> indices;
+
+    // Center vertex
+    vertices.push_back(0.0f);  // x
+    vertices.push_back(0.0f);  // y
+    vertices.push_back(0.0f);  // z
+    vertices.push_back(color.r / 255.0f);  // r
+    vertices.push_back(color.g / 255.0f);  // g
+    vertices.push_back(color.b / 255.0f);  // b
+
+    // Generate circle vertices
+    for (int i = 0; i <= segments; ++i) {
+        float angle = 2.0f * glm::pi<float>() * i / segments;
+        float x = cos(angle);
+        float y = sin(angle);
+
+        vertices.push_back(x);
+        vertices.push_back(y);
+        vertices.push_back(0.0f);
+        vertices.push_back(color.r / 255.0f);
+        vertices.push_back(color.g / 255.0f);
+        vertices.push_back(color.b / 255.0f);
+
+        if (i < segments) {
+            indices.push_back(0);
+            indices.push_back(i + 1);
+            indices.push_back(i + 2);
+        }
+    }
+
+    // Scale the transform to match the radius
+    Transform scaledTransform = transform;
+    scaledTransform.scale *= glm::vec2(radius);
+
+    // Set uniforms and bind buffers
+    setShaderUniforms(scaledTransform);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_DYNAMIC_DRAW);
+
+    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
+void Renderer::drawLine(glm::vec2 start, glm::vec2 end, float thickness, const Color& color) {
+    glm::vec2 direction = end - start;
+    float length = glm::length(direction);
+    float angle = atan2(direction.y, direction.x);
+
+    Transform transform;
+    transform.position = start + direction * 0.5f;
+    transform.rotation = angle;
+    transform.scale = glm::vec2(length, thickness);
+
+    //drawRectangle(transform, glm::vec2(1.0f), color);
+}
+
+void Renderer::drawPolygon(const std::vector<glm::vec2>& points, const Color& color, bool filled) {
+    if (points.size() < 3) return;
+
+    std::vector<float> vertices;
+    std::vector<unsigned int> indices;
+
+    // Generate vertices
+    for (const auto& point : points) {
+        vertices.push_back(point.x);
+        vertices.push_back(point.y);
+        vertices.push_back(0.0f);
+        vertices.push_back(color.r / 255.0f);
+        vertices.push_back(color.g / 255.0f);
+        vertices.push_back(color.b / 255.0f);
+    }
+
+    // Generate indices
+    if (filled) {
+        // Triangulate the polygon (simple fan triangulation - assumes convex polygon)
+        for (size_t i = 1; i < points.size() - 1; ++i) {
+            indices.push_back(0);
+            indices.push_back(i);
+            indices.push_back(i + 1);
+        }
+    }
+    else {
+        // Generate line loop indices
+        for (size_t i = 0; i < points.size(); ++i) {
+            indices.push_back(i);
+            indices.push_back((i + 1) % points.size());
+        }
+    }
+
+    Transform transform;  // Identity transform
+    setShaderUniforms(transform);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_DYNAMIC_DRAW);
+
+    glDrawElements(filled ? GL_TRIANGLES : GL_LINES, indices.size(), GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
 
 void Renderer::handleFramebufferResize(int width, int height) {
     glViewport(0, 0, width, height);
