@@ -23,9 +23,11 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath) {
 		vertexCode = vShaderStream.str();
 		fragmentCode = fShaderStream.str();
 	}
-	catch (std::ifstream::failure e) {
-		std::cout << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ" << std::endl;
+	catch (const std::ios_base::failure& e) {
+		std::cout << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ\n"
+			<< "Exception: " << e.what() << std::endl;
 	}
+	
 	const char* vShaderCode = vertexCode.c_str();
 	const char* fShaderCode = fragmentCode.c_str();
 
@@ -86,5 +88,5 @@ void Shader::setFloat(const std::string& name, float value) const
 }
 
 void Shader::setMat4(const std::string& name, glm::mat4& mat) const {
-
+	glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, &mat[0][0]);
 }
