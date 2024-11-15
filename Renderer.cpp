@@ -12,8 +12,9 @@ Renderer::Renderer(std::string title, int width, int height)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-    window = glfwCreateWindow(WIDTH, HEIGHT, title.c_str(), NULL, NULL);
+    window = glfwCreateWindow(width, height, title.c_str(), NULL, NULL);
     if (window == NULL) {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -51,7 +52,7 @@ Renderer::~Renderer() {
     glfwTerminate();
 }
 
-void Renderer::drawRectangle(float x, float y, float width, float height, Color color) {
+void Renderer::drawRectangle(float x, float y, float width, float height, Color color, Shader& shader) {
     // Convert color to normalized float values (0.0 to 1.0)
     float r = color.r / 255.0f;
     float g = color.g / 255.0f;
@@ -77,7 +78,6 @@ void Renderer::drawRectangle(float x, float y, float width, float height, Color 
     transform.scale = glm::vec2(width, height);
 
     // Set shader uniforms including transform
-    Shader shader("Shaders/default.vert", "Shaders/default.frag");
     shader.use();  // Make sure we're using the right shader
     setShaderUniforms(transform);
 
@@ -109,129 +109,69 @@ void Renderer::drawRectangle(float x, float y, float width, float height, Color 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void Renderer::drawCircle(const Transform& transform, float radius, const Color& color, int segments) {
-    segments = std::max(segments, 3);
-    std::vector<float> vertices;
-    std::vector<unsigned int> indices;
+void Renderer::drawCircle(float x, float y, float radius, Color color, Shader& shader, int segments) {
+    // Convert color to normalized float values (0.0 to 1.0)
+    float r = color.r / 255.0f;
+    float g = color.g / 255.0f;
+    float b = color.b / 255.0f;
 
-    // Center vertex
+    // Vertices for a circle: Center + perimeter points
+    std::vector<float> vertices;
+
+    // Center vertex (x, y, z, r, g, b)
     vertices.push_back(0.0f);  // x
     vertices.push_back(0.0f);  // y
     vertices.push_back(0.0f);  // z
-    vertices.push_back(color.r / 255.0f);  // r
-    vertices.push_back(color.g / 255.0f);  // g
-    vertices.push_back(color.b / 255.0f);  // b
+    vertices.push_back(r);     // red
+    vertices.push_back(g);     // green
+    vertices.push_back(b);     // blue
 
-    // Generate circle vertices
+    // Perimeter vertices
     for (int i = 0; i <= segments; ++i) {
-        float angle = 2.0f * glm::pi<float>() * i / segments;
-        float x = cos(angle);
-        float y = sin(angle);
+        float angle = (2.0f * PI * i) / segments;  // Angle for this segment
+        float px = cos(angle);
+        float py = sin(angle);
 
-        vertices.push_back(x);
-        vertices.push_back(y);
-        vertices.push_back(0.0f);
-        vertices.push_back(color.r / 255.0f);
-        vertices.push_back(color.g / 255.0f);
-        vertices.push_back(color.b / 255.0f);
-
-        if (i < segments) {
-            indices.push_back(0);
-            indices.push_back(i + 1);
-            indices.push_back(i + 2);
-        }
+        vertices.push_back(px);    // x
+        vertices.push_back(py);    // y
+        vertices.push_back(0.0f);  // z
+        vertices.push_back(r);     // red
+        vertices.push_back(g);     // green
+        vertices.push_back(b);     // blue
     }
 
-    // Scale the transform to match the radius
-    Transform scaledTransform = transform;
-    scaledTransform.scale *= glm::vec2(radius);
-
-    // Set uniforms and bind buffers
-    setShaderUniforms(scaledTransform);
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_DYNAMIC_DRAW);
-
-    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
-}
-
-void Renderer::drawLine(glm::vec2 start, glm::vec2 end, float thickness, const Color& color) {
-    glm::vec2 direction = end - start;
-    float length = glm::length(direction);
-    float angle = atan2(direction.y, direction.x);
-
+    // Create transform for the circle
     Transform transform;
-    transform.position = start + direction * 0.5f;
-    transform.rotation = angle;
-    transform.scale = glm::vec2(length, thickness);
+    transform.position = glm::vec2(x, y);
+    transform.scale = glm::vec2(radius, radius);
 
-    //drawRectangle(transform, glm::vec2(1.0f), color);
-}
-
-void Renderer::drawPolygon(const std::vector<glm::vec2>& points, const Color& color, bool filled) {
-    if (points.size() < 3) return;
-
-    std::vector<float> vertices;
-    std::vector<unsigned int> indices;
-
-    // Generate vertices
-    for (const auto& point : points) {
-        vertices.push_back(point.x);
-        vertices.push_back(point.y);
-        vertices.push_back(0.0f);
-        vertices.push_back(color.r / 255.0f);
-        vertices.push_back(color.g / 255.0f);
-        vertices.push_back(color.b / 255.0f);
-    }
-
-    // Generate indices
-    if (filled) {
-        // Triangulate the polygon (simple fan triangulation - assumes convex polygon)
-        for (size_t i = 1; i < points.size() - 1; ++i) {
-            indices.push_back(0);
-            indices.push_back(i);
-            indices.push_back(i + 1);
-        }
-    }
-    else {
-        // Generate line loop indices
-        for (size_t i = 0; i < points.size(); ++i) {
-            indices.push_back(i);
-            indices.push_back((i + 1) % points.size());
-        }
-    }
-
-    Transform transform;  // Identity transform
+    // Set shader uniforms including transform
+    shader.use();  // Use the shader
     setShaderUniforms(transform);
 
+    // Update buffers
     glBindVertexArray(VAO);
+
+    // Buffer vertex data
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_DYNAMIC_DRAW);
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
-    glDrawElements(filled ? GL_TRIANGLES : GL_LINES, indices.size(), GL_UNSIGNED_INT, 0);
+    // Color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    // Draw the circle as a triangle fan
+    glDrawArrays(GL_TRIANGLE_FAN, 0, segments + 2);
+
+    // Clean up
     glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-
-void Renderer::handleFramebufferResize(int width, int height) {
-    glViewport(0, 0, width, height);
-    glm::mat4 projection = glm::ortho(0.0f, (float)this->WIDTH, (float)this->HEIGHT, 0.0f);
-    defaultShader.use();
-    defaultShader.setMat4("projection", projection);
-}
-
-void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-    Renderer* renderer = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
-    renderer->handleFramebufferResize(width, height);
-}
 
 bool Renderer::windowShouldClose() {
     return glfwWindowShouldClose(this->window);
@@ -243,14 +183,26 @@ void Renderer::clear(Color color) {
 }
 
 void Renderer::beginDrawing() {
+    this->frameStartTime = std::chrono::high_resolution_clock::now();
     glm::mat4 projection = glm::ortho(0.0f, (float)this->WIDTH, (float)-this->HEIGHT, 0.0f);
     defaultShader.use();
     defaultShader.setMat4("projection", projection);
 }
 
 void Renderer::endDrawing() {
+    auto frameStartTime = std::chrono::high_resolution_clock::now();
+
     glfwSwapBuffers(this->window);
     glfwPollEvents();
+
+    auto frameEndTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = frameEndTime - frameStartTime;
+    double elapsedSeconds = elapsed.count();
+
+    // Sleep to maintain target FPS
+    if (elapsedSeconds < frameDuration) {
+        std::this_thread::sleep_for(std::chrono::duration<double>(frameDuration - elapsedSeconds));
+    }
 }
 
 std::string glmMat4ToString(const glm::mat4& mat) {
@@ -265,4 +217,8 @@ std::string glmMat4ToString(const glm::mat4& mat) {
     }
     oss << "]";
     return oss.str();
+}
+
+void Renderer::setTargetFPS(int fps) {
+
 }

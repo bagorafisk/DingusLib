@@ -10,9 +10,5 @@ uniform mat4 projection;
 void main()
 {
     gl_Position = projection * model * vec4(aPos, 1.0);
-    // Debug: Pass through color exactly as received
     ourColor = aColor;
-    
-    // Uncomment to verify color pipeline
-    // ourColor = vec3(1.0, 1.0, 1.0);  // Pure white
 }

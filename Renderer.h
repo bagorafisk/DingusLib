@@ -7,6 +7,8 @@
 #include "Shader.h"
 #include <iostream>
 #include <vector>
+#include <chrono>
+#include <thread>
 
 struct Color {
     int r, g, b, a;
@@ -16,8 +18,13 @@ struct Color {
 };
 
 #define WHITE Color(255, 255, 255)
+#define BLACK Color(0, 0, 0)
+#define RED Color(255, 0, 0)
+#define GREEN Color(0, 255, 0)
+#define BLUE Color(0, 0, 255)
+#define DINGUSGRAY Color(18, 18, 18)
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+#define PI 3.14159265359f
 
 std::string glmMat4ToString(const glm::mat4& mat);
 
@@ -27,6 +34,8 @@ public:
     unsigned int VBO, VAO, EBO;
     int WIDTH, HEIGHT;
     Shader defaultShader;
+    int frameDuration = 1/60;
+    std::chrono::steady_clock::time_point frameStartTime = std::chrono::high_resolution_clock::now();
 
     struct Transform {
         glm::vec2 position{ 0.0f, 0.0f };
@@ -46,12 +55,8 @@ public:
     Renderer(std::string title, int width, int height);
     ~Renderer();
 
-    void handleFramebufferResize(int width, int height);
-
-    void drawRectangle(float x, float y, float width, float height, Color color);
-    void drawCircle(const Transform& transform, float radius, const Color& color, int segments = 32);
-    void drawLine(glm::vec2 start, glm::vec2 end, float thickness, const Color& color);
-    void drawPolygon(const std::vector<glm::vec2>& points, const Color& color, bool filled = true);
+    void drawRectangle(float x, float y, float width, float height, Color color, Shader& shader);
+    void drawCircle(float x, float y, float radius, Color color, Shader& shader, int segments = 36);
 
     bool windowShouldClose();
 
@@ -61,8 +66,9 @@ public:
 
     void endDrawing();
 
+    void setTargetFPS(int fps);
+
 private:
-    // Helper function to set common shader uniforms
     void setShaderUniforms(const Transform& transform) {
         defaultShader.use();
         glm::mat4 model = transform.getMatrix();
