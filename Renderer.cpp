@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "Shader.h"
 
 Renderer::Renderer(const char* title, int width, int height) {
     glfwInit();
@@ -22,6 +23,10 @@ Renderer::Renderer(const char* title, int width, int height) {
     }
 
     glViewport(0, 0, 800, 600);
+
+    Shader shader("default.vert", "default.frag");
+
+    shader.set
 }
 
 void Renderer::drawRectangle(float x, float y, float width, float height, Color color) {
