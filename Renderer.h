@@ -9,6 +9,8 @@
 #include <vector>
 #include <chrono>
 #include <thread>
+#include "Input.h"
+#include "DingusMath.h"
 
 struct Color {
     int r, g, b, a;
@@ -16,6 +18,13 @@ struct Color {
         : r(red), g(green), b(blue), a(alpha) {
     }
 };
+
+enum configFlags {
+    MSAA_4X,
+    MSAA_8X
+};
+
+static std::vector<configFlags> flags;
 
 #define WHITE Color(255, 255, 255)
 #define BLACK Color(0, 0, 0)
@@ -28,6 +37,8 @@ struct Color {
 
 std::string glmMat4ToString(const glm::mat4& mat);
 
+void setConfigFlags(configFlags flag);
+
 class Renderer {
 public:
     GLFWwindow* window;
@@ -36,6 +47,7 @@ public:
     Shader defaultShader;
     int frameDuration = 1/60;
     std::chrono::steady_clock::time_point frameStartTime = std::chrono::high_resolution_clock::now();
+    Keyboard keyboard;
 
     struct Transform {
         glm::vec2 position{ 0.0f, 0.0f };
@@ -55,8 +67,8 @@ public:
     Renderer(std::string title, int width, int height);
     ~Renderer();
 
-    void drawRectangle(float x, float y, float width, float height, Color color, Shader& shader);
-    void drawCircle(float x, float y, float radius, Color color, Shader& shader, int segments = 36);
+    void drawRectangle(float x, float y, float width, float height, Color color);
+    void drawCircle(float x, float y, float radius, Color color, int segments = 36);
 
     bool windowShouldClose();
 
@@ -77,6 +89,8 @@ private:
         defaultShader.setMat4("model", model);
         defaultShader.setMat4("projection", projection);
     }
+
+    void setConfigFlags(configFlags flag);
 };
 
 #endif

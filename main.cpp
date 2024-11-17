@@ -1,6 +1,5 @@
 #include "DingusLib.h"
 #include <string>
-#include "DingusMath.h"
 #include <cmath>
 #include <iostream>
 
@@ -10,6 +9,8 @@ int main() {
 
     Vector2 pos(350.0f, 100.0f);
     Vector2 vel(10.0f, 0.0f);
+
+    setConfigFlags(MSAA_8X);
 
     Renderer renderer("Dingus", WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -22,6 +23,10 @@ int main() {
         if (pos.y < WINDOW_HEIGHT) {
             vel.y += 1.0f;
         }
+        if (renderer.keyboard.isKeyPressed(Space)) {
+            std::cout << "Dingus!" << std::endl;
+        }
+
         if (pos.y + 100.0f > WINDOW_HEIGHT) {
             vel.y *= -0.9f;
         }
@@ -31,10 +36,10 @@ int main() {
 
         pos.add(vel);
         
-        renderer.drawCircle(100.0f, 100.0f, 50.0f, WHITE, defaultShader);
-        renderer.drawRectangle(pos.x, pos.y, 100.0f, 100.0f, BLUE, defaultShader);
-        renderer.drawRectangle(350.0f, 100.0f, 100.0f, 100.0f, GREEN, defaultShader);
-        renderer.drawRectangle(150.0f, 100.0f, 100.0f, 100.0f, RED, defaultShader);
+        renderer.drawCircle(100.0f, 100.0f, 50.0f, WHITE);
+        renderer.drawRectangle(pos.x, pos.y, 100.0f, 100.0f, BLUE);
+        renderer.drawRectangle(350.0f, 100.0f, 100.0f, 100.0f, GREEN);
+        renderer.drawRectangle(150.0f, 100.0f, 100.0f, 100.0f, RED);
 
         renderer.endDrawing();
     }

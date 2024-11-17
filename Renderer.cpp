@@ -14,6 +14,10 @@ Renderer::Renderer(std::string title, int width, int height)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
+    for (configFlags flag : flags) {
+        this->setConfigFlags(flag);
+    }
+
     window = glfwCreateWindow(width, height, title.c_str(), NULL, NULL);
     if (window == NULL) {
         std::cerr << "Failed to create GLFW window" << std::endl;
@@ -22,6 +26,8 @@ Renderer::Renderer(std::string title, int width, int height)
     }
 
     glfwMakeContextCurrent(window);
+
+    this->keyboard = Keyboard(window);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "Failed to initialize GLAD" << std::endl;
@@ -52,7 +58,7 @@ Renderer::~Renderer() {
     glfwTerminate();
 }
 
-void Renderer::drawRectangle(float x, float y, float width, float height, Color color, Shader& shader) {
+void Renderer::drawRectangle(float x, float y, float width, float height, Color color) {
     // Convert color to normalized float values (0.0 to 1.0)
     float r = color.r / 255.0f;
     float g = color.g / 255.0f;
@@ -78,7 +84,7 @@ void Renderer::drawRectangle(float x, float y, float width, float height, Color 
     transform.scale = glm::vec2(width, height);
 
     // Set shader uniforms including transform
-    shader.use();  // Make sure we're using the right shader
+    defaultShader.use();  // Make sure we're using the right shader
     setShaderUniforms(transform);
 
     // Update buffers
@@ -109,7 +115,7 @@ void Renderer::drawRectangle(float x, float y, float width, float height, Color 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void Renderer::drawCircle(float x, float y, float radius, Color color, Shader& shader, int segments) {
+void Renderer::drawCircle(float x, float y, float radius, Color color, int segments) {
     // Convert color to normalized float values (0.0 to 1.0)
     float r = color.r / 255.0f;
     float g = color.g / 255.0f;
@@ -146,7 +152,7 @@ void Renderer::drawCircle(float x, float y, float radius, Color color, Shader& s
     transform.scale = glm::vec2(radius, radius);
 
     // Set shader uniforms including transform
-    shader.use();  // Use the shader
+    defaultShader.use();  // Use the shader
     setShaderUniforms(transform);
 
     // Update buffers
@@ -221,4 +227,22 @@ std::string glmMat4ToString(const glm::mat4& mat) {
 
 void Renderer::setTargetFPS(int fps) {
 
+}
+
+void setConfigFlags(configFlags flag) {
+    flags.push_back(flag);
+}
+
+void Renderer::setConfigFlags(configFlags flag) {
+    switch (flag)
+    {
+    case MSAA_4X:
+        glfwWindowHint(GLFW_SAMPLES, 4);
+        break;
+    case MSAA_8X:
+        glfwWindowHint(GLFW_SAMPLES, 8);
+        break;
+    default:
+        break;
+    }
 }
